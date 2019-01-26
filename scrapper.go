@@ -4,19 +4,18 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/PuerkitoBio/goquery"
 	"github.com/gocolly/colly"
 	"github.com/gocolly/colly/debug"
 )
 
-type Matches struct {
+type MatchStats struct {
 	Date         string
 	LocalTeam    string
 	Result       string
 	VisitingTeam string
-	Location     string
+	Stadium      string
 }
 
 type Clasification struct {
@@ -25,8 +24,10 @@ type Clasification struct {
 }
 
 type TeamStats struct {
+	Position      int
 	Team          string
 	Points        int
+	League_Day    int
 	MatchesPlayed int
 	MatchesWin    int
 	MatchesDraw   int
@@ -54,69 +55,53 @@ func main() {
 	c.OnHTML(`table`, func(e *colly.HTMLElement) {
 		table_id := e.Attr(`id`)
 		if strings.Contains(table_id, "tabla1") {
-			Matches_list := []Matches{}
+			Matches_list := []MatchStats{}
 			e.ForEach("table tbody", func(_ int, el *colly.HTMLElement) {
 				ch := e.DOM.Children()
-				Match := Matches{}
+				Match := MatchStats{}
 				ch.Find("tr").Each(func(clss int, tr *goquery.Selection) {
 					row_node := tr.Find("td")
-					if row_node.HasClass("equipo1") {
-						row_node.Find(".equipo1").Each(func(clss int, s *goquery.Selection) {
-							band := s.Attr("class")
-							fmt.Printf("%s", band)
-						})
-
-						Match.LocalTeam = row_node.Find(".equipo1").Text()
-
-						fmt.Printf("%s", "Hola")
-						//Match.LocalTeam = row_node.Find("a:nth-child(2)").Text()
-						//clase := row_node.RemoveClass("equipo1")
-						//fmt.Printf("%s", row_node.Find("a:nth-of-type(3)").Text())
-						//Find("a:nth-child(2)").Text())
-					}
-					//if row_node.HasClass("equipo2") {
-
-					//	Match.VisitingTeam = row_node.Find("a:nth-child(2)").Text()
-					//}
-					//if row_node.HasClass("rstd") {
-					//	row_node.Find(".rstd").Each(func(_ int, ul *goquery.Selection) {
-					//		a := row_node.Find(".rstd")
-					//		fmt.Printf("%s", a.Text())
-					//	})
-					//Match.Result = clss
-					//	Match.Date = row_node.Find("span:nth-of-type(2)").Text()
-					//	Match.Location = row_node.Find("span:nth-of-type(3)").Text()
-					//fmt.Printf("%s", Match.Result)
-					//}
-					//fmt.Printf("%s", Match)
+					Match.Result = row_node.Find("span").Last().Text()
+					Match.Date = row_node.Find("span").Next().First().Text()
+					Match.Stadium = row_node.Find("span").Next().Next().First().Text()
+					Match.LocalTeam = row_node.Find("a").Next().First().Text()
+					Match.VisitingTeam = row_node.Find("a").Next().Slice(1, 2).Text()
 					Matches_list = append(Matches_list, Match)
 				})
 			})
+			fmt.Println("%s", Matches_list)
+
 		}
 
 		if strings.Contains(table_id, "tabla2") {
-			LeagueTable := Clasification{}
+			Table := []TeamStats{}
 			e.ForEach("table tbody", func(_ int, el *colly.HTMLElement) {
 				ch := e.DOM.Children()
+				Team := TeamStats{}
+				count := 0
 				ch.Find("tr").Each(func(clss int, tr *goquery.Selection) {
-					LeagueTable.Position = string_to_integer(tr.Find("th").Text())
-					time.Sleep(10)
-					row_node := tr.Find("td")
-					if row_node.HasClass("equipo") {
-						LeagueTable.Team = row_node.Find("a").Text()
+					if count == 0 {
 					}
-					//fmt.Printf("%s", LeagueTable.Position)
-					//if row_node.HasClass("pts") {
-					//	LeagueTable.Points = row_node.Attr("")
-					//}
-
+					if count != 0 {
+						row_node := tr.Find("td").First()
+						index_node := tr.Find("th")
+						Team.Position = string_to_integer(index_node.Text())
+						Team.Team = row_node.Find("a").First().Text()
+						Team.Points = string_to_integer(row_node.Next().First().Text())
+						Team.MatchesPlayed = string_to_integer(row_node.Next().Next().First().Text())
+						Team.MatchesWin = string_to_integer(row_node.Next().Next().Next().First().Text())
+						Team.MatchesDraw = string_to_integer(row_node.Next().Next().Next().Next().First().Text())
+						Team.MatchesLoose = string_to_integer(row_node.Next().Next().Next().Next().Next().First().Text())
+						Team.GoalsScore = string_to_integer(row_node.Next().Next().Next().Next().Next().Next().Text())
+						Team.GoalsRecieve = string_to_integer(row_node.Next().Next().Next().Next().Next().Next().Next().First().Text())
+						Table = append(Table, Team)
+					}
+					count += 1
 				})
 			})
-
+			fmt.Println("%s", Table)
 		}
-
 	})
-
 	c.Visit("http://www.resultados-futbol.com/primera1932/grupo1/jornada1")
 
 }
