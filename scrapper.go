@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"strconv"
 	"strings"
@@ -18,22 +19,37 @@ type MatchStats struct {
 	Stadium      string
 }
 
-type Clasification struct {
-	Position int
-	TeamStats
-}
-
 type TeamStats struct {
 	Position      int
 	Team          string
 	Points        int
-	League_Day    int
 	MatchesPlayed int
 	MatchesWin    int
 	MatchesDraw   int
 	MatchesLoose  int
 	GoalsScore    int
 	GoalsRecieve  int
+}
+
+type Pages_to_Crawl struct {
+	link map[string]struct{}
+}
+
+var exists = struct{}{}
+
+func links_set() *Pages_to_Crawl {
+	p := &Pages_to_Crawl{}
+	p.link = make(map[string]struct{})
+	return p
+}
+
+func (p *Pages_to_Crawl) Add_link(link string) {
+	p.link[link] = exists
+}
+
+func (p *Pages_to_Crawl) Contains(link string) bool {
+	_, c := p.link[link]
+	return c
 }
 
 func string_to_integer(scraper_input string) int {
@@ -43,7 +59,11 @@ func string_to_integer(scraper_input string) int {
 	return integer
 }
 func main() {
+
 	c := colly.NewCollector(colly.Debugger(&debug.LogDebugger{}))
+
+	Table := []TeamStats{}
+	Matches_list := []MatchStats{}
 
 	c.OnRequest(func(r *colly.Request) {
 		fmt.Println("Visiting", r.URL.String())
@@ -52,14 +72,21 @@ func main() {
 	c.OnError(func(r *colly.Response, err error) {
 		fmt.Println("Request URL:", r.Request.URL, "failed with response:", r, "\nError:", err)
 	})
+
+	c.OnHTML("a[href]", func(e *colly.HTMLElement) {
+		link := e.Attr("href")
+		if strings.Contains(link, "primera") && strings.Contains(link, "jornada") {
+			e.Request.Visit(link)
+		}
+	})
+
 	c.OnHTML(`table`, func(e *colly.HTMLElement) {
 		table_id := e.Attr(`id`)
 		if strings.Contains(table_id, "tabla1") {
-			Matches_list := []MatchStats{}
 			e.ForEach("table tbody", func(_ int, el *colly.HTMLElement) {
 				ch := e.DOM.Children()
 				Match := MatchStats{}
-				ch.Find("tr").Each(func(clss int, tr *goquery.Selection) {
+				ch.Find("tr").Each(func(td int, tr *goquery.Selection) {
 					row_node := tr.Find("td")
 					Match.Result = row_node.Find("span").Last().Text()
 					Match.Date = row_node.Find("span").Next().First().Text()
@@ -69,12 +96,9 @@ func main() {
 					Matches_list = append(Matches_list, Match)
 				})
 			})
-			fmt.Println("%s", Matches_list)
-
 		}
 
 		if strings.Contains(table_id, "tabla2") {
-			Table := []TeamStats{}
 			e.ForEach("table tbody", func(_ int, el *colly.HTMLElement) {
 				ch := e.DOM.Children()
 				Team := TeamStats{}
@@ -99,9 +123,16 @@ func main() {
 					count += 1
 				})
 			})
-			fmt.Println("%s", Table)
 		}
 	})
 	c.Visit("http://www.resultados-futbol.com/primera1932/grupo1/jornada1")
+
+	jsonData, err := json.MarshalIndent(Table, "", "  ")
+	if err != nil {
+		panic(err)
+	}
+
+	// Dump json to the standard output (can be redirected to a file)
+	fmt.Println(string(jsonData))
 
 }
