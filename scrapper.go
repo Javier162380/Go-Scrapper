@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"os"
 	"strconv"
 	"strings"
 
@@ -20,36 +21,18 @@ type MatchStats struct {
 }
 
 type TeamStats struct {
-	Position      int
-	Team          string
-	Points        int
-	MatchesPlayed int
-	MatchesWin    int
-	MatchesDraw   int
-	MatchesLoose  int
-	GoalsScore    int
-	GoalsRecieve  int
-}
-
-type Pages_to_Crawl struct {
-	link map[string]struct{}
-}
-
-var exists = struct{}{}
-
-func links_set() *Pages_to_Crawl {
-	p := &Pages_to_Crawl{}
-	p.link = make(map[string]struct{})
-	return p
-}
-
-func (p *Pages_to_Crawl) Add_link(link string) {
-	p.link[link] = exists
-}
-
-func (p *Pages_to_Crawl) Contains(link string) bool {
-	_, c := p.link[link]
-	return c
+	Year            int
+	LeagueDate      int
+	Position        int
+	Team            string
+	Points          int
+	MatchesPlayed   int
+	MatchesWin      int
+	MatchesDraw     int
+	MatchesLoose    int
+	GoalsScore      int
+	GoalsRecieve    int
+	GoalsDifference int
 }
 
 func string_to_integer(scraper_input string) int {
@@ -58,6 +41,7 @@ func string_to_integer(scraper_input string) int {
 	}
 	return integer
 }
+
 func main() {
 
 	c := colly.NewCollector(colly.Debugger(&debug.LogDebugger{}))
@@ -66,6 +50,7 @@ func main() {
 	Matches_list := []MatchStats{}
 
 	c.OnRequest(func(r *colly.Request) {
+		r.Ctx.Put("url", r.URL.String())
 		fmt.Println("Visiting", r.URL.String())
 	})
 
@@ -82,6 +67,7 @@ func main() {
 
 	c.OnHTML(`table`, func(e *colly.HTMLElement) {
 		table_id := e.Attr(`id`)
+
 		if strings.Contains(table_id, "tabla1") {
 			e.ForEach("table tbody", func(_ int, el *colly.HTMLElement) {
 				ch := e.DOM.Children()
@@ -92,7 +78,7 @@ func main() {
 					Match.Date = row_node.Find("span").Next().First().Text()
 					Match.Stadium = row_node.Find("span").Next().Next().First().Text()
 					Match.LocalTeam = row_node.Find("a").Next().First().Text()
-					Match.VisitingTeam = row_node.Find("a").Next().Slice(1, 2).Text()
+					Match.VisitingTeam = row_node.Find("a").Next().First().Text()
 					Matches_list = append(Matches_list, Match)
 				})
 			})
@@ -118,6 +104,7 @@ func main() {
 						Team.MatchesLoose = string_to_integer(row_node.Next().Next().Next().Next().Next().First().Text())
 						Team.GoalsScore = string_to_integer(row_node.Next().Next().Next().Next().Next().Next().Text())
 						Team.GoalsRecieve = string_to_integer(row_node.Next().Next().Next().Next().Next().Next().Next().First().Text())
+						Team.GoalsDifference = Team.GoalsScore - Team.GoalsRecieve
 						Table = append(Table, Team)
 					}
 					count += 1
@@ -125,14 +112,18 @@ func main() {
 			})
 		}
 	})
-	c.Visit("http://www.resultados-futbol.com/primera1932/grupo1/jornada1")
 
-	jsonData, err := json.MarshalIndent(Table, "", "  ")
-	if err != nil {
-		panic(err)
+	for year := 1932; year <= 2018; year++ {
+		root_url := "http://www.resultados-futbol.com/primera"
+		start_date := fmt.Sprintf("%s/%s", strconv.Itoa(year), "/grupo1/jornada1")
+		visit_link := fmt.Sprintf("%s%s", root_url, start_date)
+		c.Visit(visit_link)
 	}
 
-	// Dump json to the standard output (can be redirected to a file)
-	fmt.Println(string(jsonData))
+	resultsWriter, _ := os.Create("scrapper_results/results_evolution.json")
+	json.NewEncoder(resultsWriter).Encode(Table)
+
+	matchesWriter, _ := os.Create("scrapper_results/matches_evolution.json")
+	json.NewEncoder(matchesWriter).Encode(Matches_list)
 
 }
