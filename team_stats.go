@@ -1,4 +1,4 @@
-package main
+package teamstats
 
 import (
 	"encoding/json"
@@ -11,14 +11,6 @@ import (
 	"github.com/gocolly/colly"
 	"github.com/gocolly/colly/debug"
 )
-
-type MatchStats struct {
-	Date         string
-	LocalTeam    string
-	Result       string
-	VisitingTeam string
-	Stadium      string
-}
 
 type TeamStats struct {
 	Year            int
@@ -42,12 +34,18 @@ func string_to_integer(scraper_input string) int {
 	return integer
 }
 
-func main() {
+func parse_request_url_year(requests_input string) string {
+	if strings.Contains(requests_input, "/") {
+		return strings.Split(requests_input, "/")[0]
+	}
+	return requests_input
+}
+
+func teamstats() {
 
 	c := colly.NewCollector(colly.Debugger(&debug.LogDebugger{}))
 
 	Table := []TeamStats{}
-	Matches_list := []MatchStats{}
 
 	c.OnRequest(func(r *colly.Request) {
 		r.Ctx.Put("url", r.URL.String())
@@ -61,29 +59,18 @@ func main() {
 	c.OnHTML("a[href]", func(e *colly.HTMLElement) {
 		link := e.Attr("href")
 		if strings.Contains(link, "primera") && strings.Contains(link, "jornada") {
+			fmt.Printf("%s", link)
 			e.Request.Visit(link)
 		}
+
 	})
 
 	c.OnHTML(`table`, func(e *colly.HTMLElement) {
 		table_id := e.Attr(`id`)
-
-		if strings.Contains(table_id, "tabla1") {
-			e.ForEach("table tbody", func(_ int, el *colly.HTMLElement) {
-				ch := e.DOM.Children()
-				Match := MatchStats{}
-				ch.Find("tr").Each(func(td int, tr *goquery.Selection) {
-					row_node := tr.Find("td")
-					Match.Result = row_node.Find("span").Last().Text()
-					Match.Date = row_node.Find("span").Next().First().Text()
-					Match.Stadium = row_node.Find("span").Next().Next().First().Text()
-					Match.LocalTeam = row_node.Find("a").Next().First().Text()
-					Match.VisitingTeam = row_node.Find("a").Next().First().Text()
-					Matches_list = append(Matches_list, Match)
-				})
-			})
-		}
-
+		request_url := e.Request.Ctx.Get("url")
+		LeagueDate_Split := strings.Split(request_url, "/grupo1/jornada")
+		Year_Split := strings.Split(LeagueDate_Split[0], "primera")[1]
+		Year := parse_request_url_year(Year_Split)
 		if strings.Contains(table_id, "tabla2") {
 			e.ForEach("table tbody", func(_ int, el *colly.HTMLElement) {
 				ch := e.DOM.Children()
@@ -95,6 +82,8 @@ func main() {
 					if count != 0 {
 						row_node := tr.Find("td").First()
 						index_node := tr.Find("th")
+						Team.Year = string_to_integer(Year)
+						Team.LeagueDate = string_to_integer(row_node.Next().Next().First().Text())
 						Team.Position = string_to_integer(index_node.Text())
 						Team.Team = row_node.Find("a").First().Text()
 						Team.Points = string_to_integer(row_node.Next().First().Text())
@@ -113,17 +102,15 @@ func main() {
 		}
 	})
 
-	for year := 1932; year <= 2018; year++ {
+	for year := 1932; year <= 2019; year++ {
 		root_url := "http://www.resultados-futbol.com/primera"
-		start_date := fmt.Sprintf("%s/%s", strconv.Itoa(year), "/grupo1/jornada1")
+		start_date := fmt.Sprintf("%s/%s", strconv.Itoa(year), "/grupo1/jornada")
 		visit_link := fmt.Sprintf("%s%s", root_url, start_date)
 		c.Visit(visit_link)
+
 	}
 
-	resultsWriter, _ := os.Create("scrapper_results/results_evolution.json")
+	resultsWriter, _ := os.Create("scrapper_results/results_evolution_v2.json")
 	json.NewEncoder(resultsWriter).Encode(Table)
-
-	matchesWriter, _ := os.Create("scrapper_results/matches_evolution.json")
-	json.NewEncoder(matchesWriter).Encode(Matches_list)
 
 }
