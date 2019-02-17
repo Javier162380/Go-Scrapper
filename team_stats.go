@@ -1,8 +1,9 @@
-package teamstats
+package soccer_scrapper
 
 import (
 	"encoding/json"
 	"fmt"
+	"javier162380/soccer-scrapper/helpers"
 	"os"
 	"strconv"
 	"strings"
@@ -27,20 +28,6 @@ type TeamStats struct {
 	GoalsDifference int
 }
 
-func string_to_integer(scraper_input string) int {
-	integer, err := strconv.Atoi(scraper_input)
-	if err != nil {
-	}
-	return integer
-}
-
-func parse_request_url_year(requests_input string) string {
-	if strings.Contains(requests_input, "/") {
-		return strings.Split(requests_input, "/")[0]
-	}
-	return requests_input
-}
-
 func teamstats() {
 
 	c := colly.NewCollector(colly.Debugger(&debug.LogDebugger{}))
@@ -58,6 +45,7 @@ func teamstats() {
 
 	c.OnHTML("a[href]", func(e *colly.HTMLElement) {
 		link := e.Attr("href")
+		fmt.Println("link")
 		if strings.Contains(link, "primera") && strings.Contains(link, "jornada") {
 			fmt.Printf("%s", link)
 			e.Request.Visit(link)
@@ -70,7 +58,7 @@ func teamstats() {
 		request_url := e.Request.Ctx.Get("url")
 		LeagueDate_Split := strings.Split(request_url, "/grupo1/jornada")
 		Year_Split := strings.Split(LeagueDate_Split[0], "primera")[1]
-		Year := parse_request_url_year(Year_Split)
+		Year := helpers.Parse_request_url_year(Year_Split)
 		if strings.Contains(table_id, "tabla2") {
 			e.ForEach("table tbody", func(_ int, el *colly.HTMLElement) {
 				ch := e.DOM.Children()
@@ -82,17 +70,17 @@ func teamstats() {
 					if count != 0 {
 						row_node := tr.Find("td").First()
 						index_node := tr.Find("th")
-						Team.Year = string_to_integer(Year)
-						Team.LeagueDate = string_to_integer(row_node.Next().Next().First().Text())
-						Team.Position = string_to_integer(index_node.Text())
+						Team.Year = helpers.String_to_integer(Year)
+						Team.LeagueDate = helpers.String_to_integer(row_node.Next().Next().First().Text())
+						Team.Position = helpers.String_to_integer(index_node.Text())
 						Team.Team = row_node.Find("a").First().Text()
-						Team.Points = string_to_integer(row_node.Next().First().Text())
-						Team.MatchesPlayed = string_to_integer(row_node.Next().Next().First().Text())
-						Team.MatchesWin = string_to_integer(row_node.Next().Next().Next().First().Text())
-						Team.MatchesDraw = string_to_integer(row_node.Next().Next().Next().Next().First().Text())
-						Team.MatchesLoose = string_to_integer(row_node.Next().Next().Next().Next().Next().First().Text())
-						Team.GoalsScore = string_to_integer(row_node.Next().Next().Next().Next().Next().Next().Text())
-						Team.GoalsRecieve = string_to_integer(row_node.Next().Next().Next().Next().Next().Next().Next().First().Text())
+						Team.Points = helpers.String_to_integer(row_node.Next().First().Text())
+						Team.MatchesPlayed = helpers.String_to_integer(row_node.Next().Next().First().Text())
+						Team.MatchesWin = helpers.String_to_integer(row_node.Next().Next().Next().First().Text())
+						Team.MatchesDraw = helpers.String_to_integer(row_node.Next().Next().Next().Next().First().Text())
+						Team.MatchesLoose = helpers.String_to_integer(row_node.Next().Next().Next().Next().Next().First().Text())
+						Team.GoalsScore = helpers.String_to_integer(row_node.Next().Next().Next().Next().Next().Next().Text())
+						Team.GoalsRecieve = helpers.String_to_integer(row_node.Next().Next().Next().Next().Next().Next().Next().First().Text())
 						Team.GoalsDifference = Team.GoalsScore - Team.GoalsRecieve
 						Table = append(Table, Team)
 					}
@@ -110,7 +98,7 @@ func teamstats() {
 
 	}
 
-	resultsWriter, _ := os.Create("scrapper_results/results_evolution_v2.json")
+	resultsWriter, _ := os.Create("scrapper_results/results_evolution_v3.json")
 	json.NewEncoder(resultsWriter).Encode(Table)
 
 }
