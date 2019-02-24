@@ -28,7 +28,7 @@ type TeamStats struct {
 	GoalsDifference int
 }
 
-func teamstats() {
+func Teamstats() {
 
 	c := colly.NewCollector(colly.Debugger(&debug.LogDebugger{}))
 
@@ -45,9 +45,7 @@ func teamstats() {
 
 	c.OnHTML("a[href]", func(e *colly.HTMLElement) {
 		link := e.Attr("href")
-		fmt.Println("link")
 		if strings.Contains(link, "primera") && strings.Contains(link, "jornada") {
-			fmt.Printf("%s", link)
 			e.Request.Visit(link)
 		}
 
@@ -91,7 +89,7 @@ func teamstats() {
 	})
 
 	for year := 1932; year <= 2019; year++ {
-		root_url := "http://www.resultados-futbol.com/primera"
+		root_url := helpers.Scrapper_root_url
 		start_date := fmt.Sprintf("%s/%s", strconv.Itoa(year), "/grupo1/jornada")
 		visit_link := fmt.Sprintf("%s%s", root_url, start_date)
 		c.Visit(visit_link)
