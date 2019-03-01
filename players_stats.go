@@ -10,6 +10,7 @@ import (
 
 	"github.com/PuerkitoBio/goquery"
 	"github.com/gocolly/colly"
+	"github.com/gocolly/colly/debug"
 )
 
 type Player struct {
@@ -33,11 +34,13 @@ type PlayerStats struct {
 	GoalsScore      int
 }
 
-func Player_stats() {
-	c := colly.NewCollector()
+func main() {
+	c := colly.NewCollector(colly.Debugger(&debug.LogDebugger{}))
 
-	url_collector := c.Clone()
-	players_collector := c.Clone()
+	url_collector := colly.NewCollector(colly.Debugger(&debug.LogDebugger{}),
+		colly.Async(true))
+	players_collector := colly.NewCollector(colly.Debugger(&debug.LogDebugger{}),
+		colly.Async(true))
 	Players_List := []Player{}
 
 	players_collector.OnRequest(func(r *colly.Request) {
@@ -57,6 +60,8 @@ func Player_stats() {
 		if strings.Contains(link, "jugador/") {
 			visit_link := fmt.Sprintf("%s%s", helpers.Root_url, link)
 			url_collector.Visit(visit_link)
+			url_collector.Wait()
+			url_collector.Limit(&colly.LimitRule{Parallelism: 20})
 		}
 
 	})
@@ -67,8 +72,11 @@ func Player_stats() {
 		year := helpers.Parse_request_url_player_year(requests_url)
 		if strings.Contains(link, fmt.Sprintf("%s/%s", "jugador", strconv.Itoa(year))) {
 			players_collector.Visit(link)
-		}
+			players_collector.Wait()
+			players_collector.Limit(&colly.LimitRule{
+				Parallelism: 20})
 
+		}
 	})
 
 	players_collector.OnHTML(`table`, func(e *colly.HTMLElement) {
@@ -123,7 +131,7 @@ func Player_stats() {
 		c.Visit(visit_link)
 	}
 
-	resultsWriter, _ := os.Create("scrapper_results/.json")
+	resultsWriter, _ := os.Create("scrapper_results/players_json.json")
 	json.NewEncoder(resultsWriter).Encode(Players_List)
 
 }
