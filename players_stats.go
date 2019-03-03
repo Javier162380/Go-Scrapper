@@ -34,14 +34,29 @@ type PlayerStats struct {
 	GoalsScore      int
 }
 
-func main() {
+type PlayerInformation struct {
+	PlayerID       int
+	YearUrl        int
+	PlayerName     string
+	PlayerFullName string
+	BirthPlace     string
+	BirthDate      string
+	BirthCountry   string
+	Nationality    string
+	Position       string
+	Heigth         string
+	Weigth         string
+}
+
+func soccer_scrapper() {
 	c := colly.NewCollector(colly.Debugger(&debug.LogDebugger{}))
 
-	url_collector := colly.NewCollector(colly.Debugger(&debug.LogDebugger{}),
-		colly.Async(true))
-	players_collector := colly.NewCollector(colly.Debugger(&debug.LogDebugger{}),
-		colly.Async(true))
+	url_collector := colly.NewCollector(colly.Async(true))
+	url_collector.Limit(&colly.LimitRule{Parallelism: 20})
+	players_collector := url_collector.Clone()
+
 	Players_List := []Player{}
+	PlayerInformation_List := []PlayerInformation{}
 
 	players_collector.OnRequest(func(r *colly.Request) {
 		r.Ctx.Put("url", r.URL.String())
@@ -52,7 +67,8 @@ func main() {
 	})
 
 	c.OnError(func(r *colly.Response, err error) {
-		fmt.Println("Request URL:", r.Request.URL, "failed with response:", r, "\nError:", err)
+		fmt.Println("Request URL:", r.Request.URL,
+			"failed with response:", r, "\nError:", err)
 	})
 
 	c.OnHTML("a[href]", func(e *colly.HTMLElement) {
@@ -61,7 +77,6 @@ func main() {
 			visit_link := fmt.Sprintf("%s%s", helpers.Root_url, link)
 			url_collector.Visit(visit_link)
 			url_collector.Wait()
-			url_collector.Limit(&colly.LimitRule{Parallelism: 20})
 		}
 
 	})
@@ -124,14 +139,64 @@ func main() {
 		}
 	})
 
+	players_collector.OnHTML(`div[id=pinfo]`, func(e *colly.HTMLElement) {
+		PlayerInfo := PlayerInformation{}
+		requests_url := e.Request.Ctx.Get("url")
+		id := helpers.Parse_request_url_player_id(requests_url)
+		year := helpers.Parse_request_url_player_year(requests_url)
+		PlayerInfo.YearUrl = year
+		PlayerInfo.PlayerID = id
+		if e.ChildText("div[class=contentitem] > dl > dt:nth-child(1)") == "Nombre" {
+			PlayerInfo.PlayerName = e.ChildText("div[class=contentitem] > dl > dd:nth-child(2)")
+		}
+
+		if e.ChildText("div[class=contentitem] > dl > dt:nth-child(3)") == "Completo" {
+			PlayerInfo.PlayerFullName = e.ChildText("div[class=contentitem] > dl > dd:nth-child(4)")
+		}
+
+		if e.ChildText("div[class=contentitem] > dl > dt:nth-child(7)") == "Fecha de nacimiento" {
+			PlayerInfo.BirthDate = e.ChildText("div[class=contentitem] > dl > dd:nth-child(8)")
+		}
+
+		if e.ChildText("div[class=contentitem] > dl > dt:nth-child(9)") == "Lugar de nacimiento" {
+			PlayerInfo.BirthPlace = e.ChildText("div[class=contentitem] > dl > dd:nth-child(10)")
+		}
+
+		if e.ChildText("div[class=contentitem] > dl > dt:nth-child(11)") == "País" {
+			PlayerInfo.BirthCountry = e.ChildText("div[class=contentitem] > dl > dd:nth-child(12)")
+		}
+
+		if e.ChildText("div[class=contentitem] > dl > dt:nth-child(13)") == "Nacionalidad" {
+			PlayerInfo.Nationality = e.ChildText("div[class=contentitem] > dl > dd:nth-child(14)")
+		}
+
+		if e.ChildText("div[class=contentitem] > dl > dt:nth-child(15)") == "Demarcación" {
+			PlayerInfo.Position = e.ChildText("div[class=contentitem] > dl > dd:nth-child(16)")
+		}
+
+		if e.ChildText("div[class=contentitem] > dl > dt:nth-child(17)") == "Altura" {
+			PlayerInfo.Heigth = e.ChildText("div[class=contentitem] > dl > dd:nth-child(18)")
+		}
+
+		if e.ChildText("div[class=contentitem] > dl > dt:nth-child(19)") == "Peso" {
+			PlayerInfo.Weigth = e.ChildText("div[class=contentitem] > dl > dd:nth-child(20)")
+		}
+
+		if PlayerInfo.PlayerID != 0 {
+			PlayerInformation_List = append(PlayerInformation_List, PlayerInfo)
+		}
+	})
+
 	for year := 1932; year <= 2019; year++ {
 		root_url := helpers.Scrapper_root_url
-		start_date := fmt.Sprintf("%s/%s", strconv.Itoa(year), "/grupo1/jornada")
+		start_date := fmt.Sprintf("%s/%s", strconv.Itoa(year), "grupo1/jugadores")
 		visit_link := fmt.Sprintf("%s%s", root_url, start_date)
 		c.Visit(visit_link)
 	}
 
-	resultsWriter, _ := os.Create("scrapper_results/players_json.json")
-	json.NewEncoder(resultsWriter).Encode(Players_List)
+	playersstatsWriter, _ := os.Create("scrapper_results/playersstats.json")
+	json.NewEncoder(playersstatsWriter).Encode(Players_List)
 
+	playersinformationwriter, _ := os.Create("scrapper_results/playersinformation.json")
+	json.NewEncoder(playersinformationwriter).Encode(PlayerInformation_List)
 }
