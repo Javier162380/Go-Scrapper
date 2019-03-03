@@ -48,7 +48,7 @@ type PlayerInformation struct {
 	Weigth         string
 }
 
-func soccer_scrapper() {
+func Players_stats() {
 	c := colly.NewCollector(colly.Debugger(&debug.LogDebugger{}))
 
 	url_collector := colly.NewCollector(colly.Async(true))
