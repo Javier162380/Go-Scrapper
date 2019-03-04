@@ -170,7 +170,6 @@ func Team_stats() {
 								> span[class=claseR]:nth-child(2)`))
 			GameIdentify.GameInformation = Game
 			Games = append(Games, GameIdentify)
-			fmt.Println(Games)
 		}
 	})
 
