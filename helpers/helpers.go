@@ -72,3 +72,11 @@ func Parse_request_url_player_id(requests_input string) int {
 	return 0
 
 }
+
+func Parse_requests_url_year_game(requests_input string) int {
+	if strings.Contains(requests_input, "partido/") {
+		root_url := strings.Split(requests_input, "/")
+		return String_to_integer(root_url[len(root_url)-1])
+	}
+	return 0
+}
